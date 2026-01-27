@@ -530,33 +530,38 @@ class TestTimeline(unittest.TestCase):
         time = ExactTime(calendar=CalendarFields(year=2024, month=3, day=15))
         event1 = Event("event_1", "src_1", "First event", time)
         event2 = Event("event_2", "src_1", "Second event", time)
-        timeline = Timeline("tl_1", "Test timeline", [event1, event2])
+        timeline = Timeline("tl_1", "Test timeline")
+        timeline.add_event(event1)
+        timeline.add_event(event2)
         self.assertEqual(timeline.timeline_id, "tl_1")
         self.assertEqual(timeline.description, "Test timeline")
-        self.assertEqual(len(timeline.events), 2)
+        self.assertEqual(len(timeline.get_all_events()), 2)
 
     def test_timeline_empty_events(self):
         """Test Timeline with empty events list"""
-        timeline = Timeline("tl_empty", "Empty timeline", [])
-        self.assertEqual(len(timeline.events), 0)
-        self.assertEqual(timeline.events, [])
+        timeline = Timeline("tl_empty", "Empty timeline")
+        self.assertEqual(len(timeline.get_all_events()), 0)
+        self.assertEqual(timeline.get_all_events(), [])
 
     def test_timeline_single_event(self):
         """Test Timeline with single event"""
         time = ExactTime(calendar=CalendarFields(year=2024, month=3, day=15))
         event = Event("event_1", "src_1", "Single event", time)
-        timeline = Timeline("tl_single", "Single event timeline", [event])
-        self.assertEqual(len(timeline.events), 1)
-        self.assertEqual(timeline.events[0].event_id, "event_1")
+        timeline = Timeline("tl_single", "Single event timeline")
+        timeline.add_event(event)
+        self.assertEqual(len(timeline.get_all_events()), 1)
+        self.assertEqual(timeline.get_all_events()[0].event_id, "event_1")
 
     def test_timeline_multiple_events(self):
         """Test Timeline with multiple events"""
         time = ExactTime(calendar=CalendarFields(year=2024, month=3, day=15))
         events = [Event(f"event_{i}", "src_1", f"Event {i}", time) for i in range(10)]
-        timeline = Timeline("tl_multi", "Multiple events timeline", events)
-        self.assertEqual(len(timeline.events), 10)
-        self.assertEqual(timeline.events[0].event_id, "event_0")
-        self.assertEqual(timeline.events[-1].event_id, "event_9")
+        timeline = Timeline("tl_multi", "Multiple events timeline")
+        for event in events:
+            timeline.add_event(event)
+        self.assertEqual(len(timeline.get_all_events()), 10)
+        self.assertEqual(timeline.get_all_events()[0].event_id, "event_0")
+        self.assertEqual(timeline.get_all_events()[-1].event_id, "event_9")
 
     def test_timeline_events_with_different_sources(self):
         """Test Timeline with events from different sources"""
@@ -564,18 +569,22 @@ class TestTimeline(unittest.TestCase):
         event1 = Event("event_1", "src_1", "Event from source 1", time)
         event2 = Event("event_2", "src_2", "Event from source 2", time)
         event3 = Event("event_3", "src_1", "Another event from source 1", time)
-        timeline = Timeline("tl_mixed", "Mixed sources timeline", [event1, event2, event3])
-        self.assertEqual(len(timeline.events), 3)
-        self.assertEqual(timeline.events[0].source_id, "src_1")
-        self.assertEqual(timeline.events[1].source_id, "src_2")
-        self.assertEqual(timeline.events[2].source_id, "src_1")
+        timeline = Timeline("tl_mixed", "Mixed sources timeline")
+        timeline.add_event(event1)
+        timeline.add_event(event2)
+        timeline.add_event(event3)
+        self.assertEqual(len(timeline.get_all_events()), 3)
+        self.assertEqual(timeline.get_all_events()[0].source_id, "src_1")
+        self.assertEqual(timeline.get_all_events()[1].source_id, "src_2")
+        self.assertEqual(timeline.get_all_events()[2].source_id, "src_1")
 
     def test_timeline_add_event_duplicate_id(self):
         """Test Timeline.add_event() raises ValueError for duplicate event_id"""
         time = ExactTime(calendar=CalendarFields(year=2024, month=3, day=15))
         event1 = Event("event_1", "src_1", "First event", time)
         event2 = Event("event_1", "src_1", "Duplicate event", time)
-        timeline = Timeline("tl_1", "Test timeline", [event1])
+        timeline = Timeline("tl_1", "Test timeline")
+        timeline.add_event(event1)
         
         with self.assertRaises(ValueError) as context:
             timeline.add_event(event2)
@@ -586,12 +595,62 @@ class TestTimeline(unittest.TestCase):
         time = ExactTime(calendar=CalendarFields(year=2024, month=3, day=15))
         event1 = Event("event_1", "src_1", "First event", time)
         event2 = Event("event_2", "src_1", "Second event", time)
-        timeline = Timeline("tl_1", "Test timeline", [event1])
+        timeline = Timeline("tl_1", "Test timeline")
+        timeline.add_event(event1)
         
         timeline.add_event(event2)
-        self.assertEqual(len(timeline.events), 2)
+        self.assertEqual(len(timeline.get_all_events()), 2)
         self.assertTrue(timeline.has_event("event_1"))
         self.assertTrue(timeline.has_event("event_2"))
+
+    def test_timeline_update_event_same_id(self):
+        """Test Timeline.update_event() updates event without changing ID"""
+        time = ExactTime(calendar=CalendarFields(year=2024, month=3, day=15))
+        original = Event("event_1", "src_1", "Original", time)
+        timeline = Timeline("tl_1", "Test timeline")
+        timeline.add_event(original)
+
+        updated = Event("event_1", "src_1", "Updated description", time)
+        timeline.update_event("event_1", updated)
+
+        self.assertTrue(timeline.has_event("event_1"))
+        self.assertEqual(timeline.get_event("event_1").description, "Updated description")
+        self.assertEqual(len(timeline.get_all_events()), 1)
+
+    def test_timeline_update_event_rename_id(self):
+        """Test Timeline.update_event() supports renaming event_id"""
+        time = ExactTime(calendar=CalendarFields(year=2024, month=3, day=15))
+        original = Event("event_1", "src_1", "Original", time)
+        timeline = Timeline("tl_1", "Test timeline")
+        timeline.add_event(original)
+
+        renamed = Event("event_2", "src_1", "Renamed", time)
+        timeline.update_event("event_1", renamed)
+
+        self.assertFalse(timeline.has_event("event_1"))
+        self.assertTrue(timeline.has_event("event_2"))
+        self.assertEqual(timeline.get_event("event_2").description, "Renamed")
+        self.assertEqual(len(timeline.get_all_events()), 1)
+
+    def test_timeline_update_event_rename_conflict(self):
+        """Test Timeline.update_event() raises ValueError on event_id conflict"""
+        time = ExactTime(calendar=CalendarFields(year=2024, month=3, day=15))
+        timeline = Timeline("tl_1", "Test timeline")
+        timeline.add_event(Event("event_1", "src_1", "First", time))
+        timeline.add_event(Event("event_2", "src_1", "Second", time))
+
+        with self.assertRaises(ValueError) as context:
+            timeline.update_event("event_1", Event("event_2", "src_1", "Conflict", time))
+        self.assertIn("already exists in timeline", str(context.exception))
+
+    def test_timeline_update_event_not_found(self):
+        """Test Timeline.update_event() raises ValueError if event not found"""
+        time = ExactTime(calendar=CalendarFields(year=2024, month=3, day=15))
+        timeline = Timeline("tl_1", "Test timeline")
+
+        with self.assertRaises(ValueError) as context:
+            timeline.update_event("event_missing", Event("event_missing", "src_1", "X", time))
+        self.assertIn("not found in timeline", str(context.exception))
 
 
 class TestProject(unittest.TestCase):
@@ -604,57 +663,69 @@ class TestProject(unittest.TestCase):
         time = ExactTime(calendar=CalendarFields(year=2024, month=3, day=15))
         event1 = Event("event_1", "src_1", "Event 1", time)
         event2 = Event("event_2", "src_2", "Event 2", time)
-        timeline = Timeline("tl_1", "Timeline 1", [event1, event2])
-        project = Project(
-            "proj_1", "Test Project", "Test description", [timeline], [source1, source2]
-        )
+        timeline = Timeline("tl_1", "Timeline 1")
+        timeline.add_event(event1)
+        timeline.add_event(event2)
+        project = Project("proj_1", "Test Project", "Test description")
+        project.add_timeline(timeline)
+        project.add_source(source1)
+        project.add_source(source2)
         self.assertEqual(project.project_id, "proj_1")
         self.assertEqual(project.title, "Test Project")
         self.assertEqual(project.description, "Test description")
-        self.assertEqual(len(project.timelines), 1)
-        self.assertEqual(len(project.sources), 2)
+        self.assertEqual(len(project.get_all_timelines()), 1)
+        self.assertEqual(len(project.get_all_sources()), 2)
 
     def test_project_empty_timelines(self):
         """Test Project with empty timelines"""
         source = Source("src_1", "Source 1", "ref://source1")
-        project = Project("proj_empty", "Empty Project", "No timelines", [], [source])
-        self.assertEqual(len(project.timelines), 0)
-        self.assertEqual(project.timelines, [])
+        project = Project("proj_empty", "Empty Project", "No timelines")
+        project.add_source(source)
+        self.assertEqual(len(project.get_all_timelines()), 0)
+        self.assertEqual(project.get_all_timelines(), [])
 
     def test_project_empty_sources(self):
         """Test Project with empty sources"""
         time = ExactTime(calendar=CalendarFields(year=2024, month=3, day=15))
         event = Event("event_1", "src_1", "Event 1", time)
-        timeline = Timeline("tl_1", "Timeline 1", [event])
-        project = Project("proj_no_sources", "No Sources Project", "No sources", [timeline], [])
-        self.assertEqual(len(project.sources), 0)
-        self.assertEqual(project.sources, [])
+        timeline = Timeline("tl_1", "Timeline 1")
+        timeline.add_event(event)
+        project = Project("proj_no_sources", "No Sources Project", "No sources")
+        project.add_timeline(timeline)
+        self.assertEqual(len(project.get_all_sources()), 0)
+        self.assertEqual(project.get_all_sources(), [])
 
     def test_project_multiple_timelines(self):
         """Test Project with multiple timelines"""
         source = Source("src_1", "Source 1", "ref://source1")
         time = ExactTime(calendar=CalendarFields(year=2024, month=3, day=15))
-        timelines = [
-            Timeline(f"tl_{i}", f"Timeline {i}", [Event(f"event_{i}", "src_1", f"Event {i}", time)])
-            for i in range(5)
-        ]
-        project = Project("proj_multi", "Multiple Timelines", "Many timelines", timelines, [source])
-        self.assertEqual(len(project.timelines), 5)
-        self.assertEqual(project.timelines[0].timeline_id, "tl_0")
-        self.assertEqual(project.timelines[-1].timeline_id, "tl_4")
+        timelines = []
+        for i in range(5):
+            tl = Timeline(f"tl_{i}", f"Timeline {i}")
+            tl.add_event(Event(f"event_{i}", "src_1", f"Event {i}", time))
+            timelines.append(tl)
+        project = Project("proj_multi", "Multiple Timelines", "Many timelines")
+        for timeline in timelines:
+            project.add_timeline(timeline)
+        project.add_source(source)
+        self.assertEqual(len(project.get_all_timelines()), 5)
+        self.assertEqual(project.get_all_timelines()[0].timeline_id, "tl_0")
+        self.assertEqual(project.get_all_timelines()[-1].timeline_id, "tl_4")
 
     def test_project_multiple_sources(self):
         """Test Project with multiple sources"""
         sources = [Source(f"src_{i}", f"Source {i}", f"ref://source{i}") for i in range(10)]
         time = ExactTime(calendar=CalendarFields(year=2024, month=3, day=15))
         event = Event("event_1", "src_1", "Event 1", time)
-        timeline = Timeline("tl_1", "Timeline 1", [event])
-        project = Project(
-            "proj_multi_sources", "Multiple Sources", "Many sources", [timeline], sources
-        )
-        self.assertEqual(len(project.sources), 10)
-        self.assertEqual(project.sources[0].source_id, "src_0")
-        self.assertEqual(project.sources[-1].source_id, "src_9")
+        timeline = Timeline("tl_1", "Timeline 1")
+        timeline.add_event(event)
+        project = Project("proj_multi_sources", "Multiple Sources", "Many sources")
+        project.add_timeline(timeline)
+        for source in sources:
+            project.add_source(source)
+        self.assertEqual(len(project.get_all_sources()), 10)
+        self.assertEqual(project.get_all_sources()[0].source_id, "src_0")
+        self.assertEqual(project.get_all_sources()[-1].source_id, "src_9")
 
     def test_project_sources_referenced_in_events(self):
         """Test that sources in project match source_ids in events"""
@@ -664,40 +735,47 @@ class TestProject(unittest.TestCase):
         event1 = Event("event_1", "src_1", "Event from source 1", time)
         event2 = Event("event_2", "src_2", "Event from source 2", time)
         event3 = Event("event_3", "src_1", "Another event from source 1", time)
-        timeline = Timeline("tl_1", "Timeline 1", [event1, event2, event3])
-        project = Project(
-            "proj_refs", "Reference Test", "Test source references", [timeline], [source1, source2]
-        )
+        timeline = Timeline("tl_1", "Timeline 1")
+        timeline.add_event(event1)
+        timeline.add_event(event2)
+        timeline.add_event(event3)
+        project = Project("proj_refs", "Reference Test", "Test source references")
+        project.add_timeline(timeline)
+        project.add_source(source1)
+        project.add_source(source2)
         # Verify sources exist in project
-        source_ids = {s.source_id for s in project.sources}
+        source_ids = {s.source_id for s in project.get_all_sources()}
         self.assertIn("src_1", source_ids)
         self.assertIn("src_2", source_ids)
         # Verify events reference these sources
-        event_source_ids = {e.source_id for e in timeline.events}
+        event_source_ids = {e.source_id for e in timeline.get_all_events()}
         self.assertTrue(event_source_ids.issubset(source_ids))
 
     def test_project_edge_case_empty_strings(self):
         """Test Project with empty strings"""
         source = Source("src_1", "Source 1", "ref://source1")
-        timeline = Timeline("tl_1", "Timeline 1", [])
-        project = Project("", "", "", [timeline], [source])
+        timeline = Timeline("tl_1", "Timeline 1")
+        project = Project("", "", "")
+        project.add_timeline(timeline)
+        project.add_source(source)
         self.assertEqual(project.project_id, "")
         self.assertEqual(project.title, "")
         self.assertEqual(project.description, "")
 
     def test_project_all_empty(self):
         """Test Project with all empty collections"""
-        project = Project("proj_empty_all", "Empty Project", "Everything empty", [], [])
-        self.assertEqual(len(project.timelines), 0)
-        self.assertEqual(len(project.sources), 0)
-        self.assertEqual(project.timelines, [])
-        self.assertEqual(project.sources, [])
+        project = Project("proj_empty_all", "Empty Project", "Everything empty")
+        self.assertEqual(len(project.get_all_timelines()), 0)
+        self.assertEqual(len(project.get_all_sources()), 0)
+        self.assertEqual(project.get_all_timelines(), [])
+        self.assertEqual(project.get_all_sources(), [])
 
     def test_project_add_source_duplicate_id(self):
         """Test Project.add_source() raises ValueError for duplicate source_id"""
         source1 = Source("src_1", "Source 1", "ref://source1")
         source2 = Source("src_1", "Source 2", "ref://source2")
-        project = Project("proj_1", "Test Project", "Test", [], [source1])
+        project = Project("proj_1", "Test Project", "Test")
+        project.add_source(source1)
         
         with self.assertRaises(ValueError) as context:
             project.add_source(source2)
@@ -707,18 +785,61 @@ class TestProject(unittest.TestCase):
         """Test Project.add_source() successfully adds source with unique ID"""
         source1 = Source("src_1", "Source 1", "ref://source1")
         source2 = Source("src_2", "Source 2", "ref://source2")
-        project = Project("proj_1", "Test Project", "Test", [], [source1])
+        project = Project("proj_1", "Test Project", "Test")
+        project.add_source(source1)
         
         project.add_source(source2)
-        self.assertEqual(len(project.sources), 2)
+        self.assertEqual(len(project.get_all_sources()), 2)
         self.assertTrue(project.has_source("src_1"))
         self.assertTrue(project.has_source("src_2"))
 
+    def test_project_update_source_same_id(self):
+        """Test Project.update_source() updates source without changing ID"""
+        project = Project("proj_1", "Test Project", "Test")
+        project.add_source(Source("src_1", "Old", "ref://old"))
+
+        project.update_source("src_1", Source("src_1", "New description", "ref://new"))
+
+        self.assertTrue(project.has_source("src_1"))
+        self.assertEqual(project.get_source("src_1").description, "New description")
+        self.assertEqual(project.get_source_count(), 1)
+
+    def test_project_update_source_rename_id(self):
+        """Test Project.update_source() supports renaming source_id"""
+        project = Project("proj_1", "Test Project", "Test")
+        project.add_source(Source("src_1", "Old", "ref://old"))
+
+        project.update_source("src_1", Source("src_2", "New", "ref://new"))
+
+        self.assertFalse(project.has_source("src_1"))
+        self.assertTrue(project.has_source("src_2"))
+        self.assertEqual(project.get_source("src_2").description, "New")
+        self.assertEqual(project.get_source_count(), 1)
+
+    def test_project_update_source_rename_conflict(self):
+        """Test Project.update_source() raises ValueError on source_id conflict"""
+        project = Project("proj_1", "Test Project", "Test")
+        project.add_source(Source("src_1", "One", "ref://1"))
+        project.add_source(Source("src_2", "Two", "ref://2"))
+
+        with self.assertRaises(ValueError) as context:
+            project.update_source("src_1", Source("src_2", "Conflict", "ref://x"))
+        self.assertIn("already exists in project", str(context.exception))
+
+    def test_project_update_source_not_found(self):
+        """Test Project.update_source() raises ValueError if source not found"""
+        project = Project("proj_1", "Test Project", "Test")
+
+        with self.assertRaises(ValueError) as context:
+            project.update_source("src_missing", Source("src_missing", "X", "ref://x"))
+        self.assertIn("not found in project", str(context.exception))
+
     def test_project_add_timeline_duplicate_id(self):
         """Test Project.add_timeline() raises ValueError for duplicate timeline_id"""
-        timeline1 = Timeline("tl_1", "Timeline 1", [])
-        timeline2 = Timeline("tl_1", "Timeline 2", [])
-        project = Project("proj_1", "Test Project", "Test", [timeline1], [])
+        timeline1 = Timeline("tl_1", "Timeline 1")
+        timeline2 = Timeline("tl_1", "Timeline 2")
+        project = Project("proj_1", "Test Project", "Test")
+        project.add_timeline(timeline1)
         
         with self.assertRaises(ValueError) as context:
             project.add_timeline(timeline2)
@@ -726,12 +847,13 @@ class TestProject(unittest.TestCase):
 
     def test_project_add_timeline_unique_id(self):
         """Test Project.add_timeline() successfully adds timeline with unique ID"""
-        timeline1 = Timeline("tl_1", "Timeline 1", [])
-        timeline2 = Timeline("tl_2", "Timeline 2", [])
-        project = Project("proj_1", "Test Project", "Test", [timeline1], [])
+        timeline1 = Timeline("tl_1", "Timeline 1")
+        timeline2 = Timeline("tl_2", "Timeline 2")
+        project = Project("proj_1", "Test Project", "Test")
+        project.add_timeline(timeline1)
         
         project.add_timeline(timeline2)
-        self.assertEqual(len(project.timelines), 2)
+        self.assertEqual(len(project.get_all_timelines()), 2)
         self.assertTrue(project.has_timeline("tl_1"))
         self.assertTrue(project.has_timeline("tl_2"))
 
@@ -740,9 +862,12 @@ class TestProject(unittest.TestCase):
         time = ExactTime(calendar=CalendarFields(year=2024, month=3, day=15))
         event1 = Event("event_1", "src_1", "First event", time)
         event2 = Event("event_1", "src_1", "Duplicate event", time)
-        timeline1 = Timeline("tl_1", "Timeline 1", [event1])
-        timeline2 = Timeline("tl_2", "Timeline 2", [])
-        project = Project("proj_1", "Test Project", "Test", [timeline1, timeline2], [])
+        timeline1 = Timeline("tl_1", "Timeline 1")
+        timeline1.add_event(event1)
+        timeline2 = Timeline("tl_2", "Timeline 2")
+        project = Project("proj_1", "Test Project", "Test")
+        project.add_timeline(timeline1)
+        project.add_timeline(timeline2)
         
         with self.assertRaises(ValueError) as context:
             project.add_event_to_timeline("tl_2", event2)
@@ -753,20 +878,91 @@ class TestProject(unittest.TestCase):
         time = ExactTime(calendar=CalendarFields(year=2024, month=3, day=15))
         event1 = Event("event_1", "src_1", "First event", time)
         event2 = Event("event_2", "src_1", "Second event", time)
-        timeline = Timeline("tl_1", "Timeline 1", [event1])
-        project = Project("proj_1", "Test Project", "Test", [timeline], [])
+        timeline = Timeline("tl_1", "Timeline 1")
+        timeline.add_event(event1)
+        project = Project("proj_1", "Test Project", "Test")
+        project.add_timeline(timeline)
         
         project.add_event_to_timeline("tl_1", event2)
-        self.assertEqual(len(timeline.events), 2)
+        self.assertEqual(len(timeline.get_all_events()), 2)
         self.assertTrue(project.has_event("event_1"))
         self.assertTrue(project.has_event("event_2"))
+
+    def test_project_update_event_in_timeline_same_id(self):
+        """Test Project.update_event_in_timeline() updates event without changing ID"""
+        project = Project("proj_1", "Test Project", "Test")
+        project.add_source(Source("src_1", "Source 1", "ref://source1"))
+        timeline = Timeline("tl_1", "Timeline 1")
+        project.add_timeline(timeline)
+
+        time = ExactTime(calendar=CalendarFields(year=2024, month=3, day=15))
+        project.add_event_to_timeline("tl_1", Event("event_1", "src_1", "Old", time))
+
+        project.update_event_in_timeline("tl_1", "event_1", Event("event_1", "src_1", "New", time))
+
+        self.assertEqual(timeline.get_event("event_1").description, "New")
+
+    def test_project_update_event_in_timeline_rename_id(self):
+        """Test Project.update_event_in_timeline() supports renaming event_id if no global conflict"""
+        project = Project("proj_1", "Test Project", "Test")
+        project.add_source(Source("src_1", "Source 1", "ref://source1"))
+        timeline = Timeline("tl_1", "Timeline 1")
+        project.add_timeline(timeline)
+
+        time = ExactTime(calendar=CalendarFields(year=2024, month=3, day=15))
+        project.add_event_to_timeline("tl_1", Event("event_1", "src_1", "Old", time))
+
+        project.update_event_in_timeline("tl_1", "event_1", Event("event_2", "src_1", "Renamed", time))
+
+        self.assertFalse(project.has_event("event_1"))
+        self.assertTrue(project.has_event("event_2"))
+        self.assertEqual(timeline.get_event("event_2").description, "Renamed")
+
+    def test_project_update_event_in_timeline_rename_conflict_global(self):
+        """Test Project.update_event_in_timeline() raises ValueError on global event_id conflict"""
+        project = Project("proj_1", "Test Project", "Test")
+        project.add_source(Source("src_1", "Source 1", "ref://source1"))
+
+        tl1 = Timeline("tl_1", "Timeline 1")
+        tl2 = Timeline("tl_2", "Timeline 2")
+        project.add_timeline(tl1)
+        project.add_timeline(tl2)
+
+        time = ExactTime(calendar=CalendarFields(year=2024, month=3, day=15))
+        project.add_event_to_timeline("tl_1", Event("event_1", "src_1", "A", time))
+        project.add_event_to_timeline("tl_2", Event("event_2", "src_1", "B", time))
+
+        with self.assertRaises(ValueError) as context:
+            project.update_event_in_timeline("tl_1", "event_1", Event("event_2", "src_1", "Conflict", time))
+        self.assertIn("already exists in project", str(context.exception))
+
+    def test_project_update_event_in_timeline_nonexistent_timeline(self):
+        """Test Project.update_event_in_timeline() raises ValueError for nonexistent timeline"""
+        project = Project("proj_1", "Test Project", "Test")
+        time = ExactTime(calendar=CalendarFields(year=2024, month=3, day=15))
+
+        with self.assertRaises(ValueError) as context:
+            project.update_event_in_timeline("tl_missing", "event_1", Event("event_1", "src_1", "X", time))
+        self.assertIn("not found in project", str(context.exception))
+
+    def test_project_update_event_in_timeline_event_not_found(self):
+        """Test Project.update_event_in_timeline() raises ValueError for nonexistent event"""
+        project = Project("proj_1", "Test Project", "Test")
+        timeline = Timeline("tl_1", "Timeline 1")
+        project.add_timeline(timeline)
+        time = ExactTime(calendar=CalendarFields(year=2024, month=3, day=15))
+
+        with self.assertRaises(ValueError) as context:
+            project.update_event_in_timeline("tl_1", "event_missing", Event("event_missing", "src_1", "X", time))
+        self.assertIn("not found in timeline", str(context.exception))
 
     def test_project_add_event_to_timeline_nonexistent_timeline(self):
         """Test Project.add_event_to_timeline() raises ValueError for nonexistent timeline"""
         time = ExactTime(calendar=CalendarFields(year=2024, month=3, day=15))
         event = Event("event_1", "src_1", "Test event", time)
-        timeline = Timeline("tl_1", "Timeline 1", [])
-        project = Project("proj_1", "Test Project", "Test", [timeline], [])
+        timeline = Timeline("tl_1", "Timeline 1")
+        project = Project("proj_1", "Test Project", "Test")
+        project.add_timeline(timeline)
         
         with self.assertRaises(ValueError) as context:
             project.add_event_to_timeline("tl_nonexistent", event)
@@ -777,9 +973,13 @@ class TestProject(unittest.TestCase):
         time = ExactTime(calendar=CalendarFields(year=2024, month=3, day=15))
         event1 = Event("event_1", "src_1", "Event 1", time)
         event2 = Event("event_2", "src_1", "Event 2", time)
-        timeline1 = Timeline("tl_1", "Timeline 1", [event1])
-        timeline2 = Timeline("tl_2", "Timeline 2", [event2])
-        project = Project("proj_1", "Test Project", "Test", [timeline1, timeline2], [])
+        timeline1 = Timeline("tl_1", "Timeline 1")
+        timeline1.add_event(event1)
+        timeline2 = Timeline("tl_2", "Timeline 2")
+        timeline2.add_event(event2)
+        project = Project("proj_1", "Test Project", "Test")
+        project.add_timeline(timeline1)
+        project.add_timeline(timeline2)
         
         self.assertTrue(project.has_event("event_1"))
         self.assertTrue(project.has_event("event_2"))
@@ -791,17 +991,20 @@ class TestProject(unittest.TestCase):
         time = ExactTime(calendar=CalendarFields(year=2024, month=3, day=15))
         event1 = Event("event_1", "src_1", "Event 1 from source", time)
         event2 = Event("event_2", "src_1", "Event 2 from same source", time)
-        timeline = Timeline("tl_1", "Timeline 1", [])
-        project = Project("proj_1", "Test Project", "Test", [timeline], [source])
+        timeline = Timeline("tl_1", "Timeline 1")
+        project = Project("proj_1", "Test Project", "Test")
+        project.add_timeline(timeline)
+        project.add_source(source)
         
         # Both events should be addable with same source_id
         project.add_event_to_timeline("tl_1", event1)
         project.add_event_to_timeline("tl_1", event2)
         
-        self.assertEqual(len(timeline.events), 2)
-        self.assertEqual(timeline.events[0].source_id, "src_1")
-        self.assertEqual(timeline.events[1].source_id, "src_1")
-        self.assertNotEqual(timeline.events[0].event_id, timeline.events[1].event_id)
+        events = timeline.get_all_events()
+        self.assertEqual(len(events), 2)
+        self.assertEqual(events[0].source_id, "src_1")
+        self.assertEqual(events[1].source_id, "src_1")
+        self.assertNotEqual(events[0].event_id, events[1].event_id)
 
 
 if __name__ == "__main__":

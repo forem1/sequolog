@@ -45,17 +45,20 @@ class TestSerializer(unittest.TestCase):
         self.event3 = Event("event_3", "src_2", "Event with relative time", relative_time)
         self.event4 = Event("event_4", "src_2", "Event with no time", no_time)
 
-        self.timeline = Timeline(
-            "tl_1", "Test Timeline", [self.event1, self.event2, self.event3, self.event4]
-        )
+        self.timeline = Timeline("tl_1", "Test Timeline")
+        self.timeline.add_event(self.event1)
+        self.timeline.add_event(self.event2)
+        self.timeline.add_event(self.event3)
+        self.timeline.add_event(self.event4)
 
         self.project = Project(
             "proj_1",
             "Test Project",
             "A test project for serialization",
-            [self.timeline],
-            [self.source1, self.source2],
         )
+        self.project.add_timeline(self.timeline)
+        self.project.add_source(self.source1)
+        self.project.add_source(self.source2)
 
     def test_project_to_dict(self):
         """Test project_to_dict serialization"""
@@ -89,7 +92,7 @@ class TestSerializer(unittest.TestCase):
         self.assertIsNotNone(loaded_timeline)
         self.assertEqual(loaded_timeline.timeline_id, self.timeline.timeline_id)
         self.assertEqual(loaded_timeline.description, self.timeline.description)
-        self.assertEqual(len(loaded_timeline.events), len(self.timeline.events))
+        self.assertEqual(len(loaded_timeline.get_all_events()), len(self.timeline.get_all_events()))
 
     def test_event_serialization(self):
         """Test event serialization and deserialization"""
@@ -212,7 +215,7 @@ class TestSerializer(unittest.TestCase):
 
     def test_empty_project_serialization(self):
         """Test serialization of empty project"""
-        empty_project = Project("empty_proj", "Empty Project", "", [], [])
+        empty_project = Project("empty_proj", "Empty Project", "")
         data = project_to_dict(empty_project)
         loaded_project = project_from_dict(data)
 
@@ -228,8 +231,11 @@ class TestSerializer(unittest.TestCase):
             calendar=CalendarFields(year=2024, month=3, day=15), uncertainty=uncertainty
         )
         event = Event("event_uncertain", "src_1", "Event with uncertainty", exact_time)
-        timeline = Timeline("tl_uncertain", "Timeline with uncertainty", [event])
-        project = Project("proj_uncertain", "Uncertainty Test", "", [timeline], [self.source1])
+        timeline = Timeline("tl_uncertain", "Timeline with uncertainty")
+        timeline.add_event(event)
+        project = Project("proj_uncertain", "Uncertainty Test", "")
+        project.add_timeline(timeline)
+        project.add_source(self.source1)
 
         data = project_to_dict(project)
         loaded_project = project_from_dict(data)
@@ -246,8 +252,11 @@ class TestSerializer(unittest.TestCase):
         """Test serialization of time with sequence"""
         exact_time = ExactTime(calendar=CalendarFields(year=2024, month=3, day=15), sequence=5)
         event = Event("event_seq", "src_1", "Event with sequence", exact_time)
-        timeline = Timeline("tl_seq", "Timeline with sequence", [event])
-        project = Project("proj_seq", "Sequence Test", "", [timeline], [self.source1])
+        timeline = Timeline("tl_seq", "Timeline with sequence")
+        timeline.add_event(event)
+        project = Project("proj_seq", "Sequence Test", "")
+        project.add_timeline(timeline)
+        project.add_source(self.source1)
 
         data = project_to_dict(project)
         loaded_project = project_from_dict(data)
@@ -261,8 +270,11 @@ class TestSerializer(unittest.TestCase):
         """Test serialization of time with timestamp"""
         exact_time = ExactTime(timestamp=1710502200)
         event = Event("event_ts", "src_1", "Event with timestamp", exact_time)
-        timeline = Timeline("tl_ts", "Timeline with timestamp", [event])
-        project = Project("proj_ts", "Timestamp Test", "", [timeline], [self.source1])
+        timeline = Timeline("tl_ts", "Timeline with timestamp")
+        timeline.add_event(event)
+        project = Project("proj_ts", "Timestamp Test", "")
+        project.add_timeline(timeline)
+        project.add_source(self.source1)
 
         data = project_to_dict(project)
         loaded_project = project_from_dict(data)
@@ -276,8 +288,11 @@ class TestSerializer(unittest.TestCase):
         """Test serialization with partial calendar fields"""
         exact_time = ExactTime(calendar=CalendarFields(year=2024, month=3))
         event = Event("event_partial", "src_1", "Event with partial date", exact_time)
-        timeline = Timeline("tl_partial", "Timeline with partial date", [event])
-        project = Project("proj_partial", "Partial Date Test", "", [timeline], [self.source1])
+        timeline = Timeline("tl_partial", "Timeline with partial date")
+        timeline.add_event(event)
+        project = Project("proj_partial", "Partial Date Test", "")
+        project.add_timeline(timeline)
+        project.add_source(self.source1)
 
         data = project_to_dict(project)
         loaded_project = project_from_dict(data)
@@ -295,8 +310,11 @@ class TestSerializer(unittest.TestCase):
             calendar=CalendarFields(year=2024, month=3, day=15, hour=10, tz_offset_minutes=180)
         )
         event = Event("event_tz", "src_1", "Event with timezone", exact_time)
-        timeline = Timeline("tl_tz", "Timeline with timezone", [event])
-        project = Project("proj_tz", "Timezone Test", "", [timeline], [self.source1])
+        timeline = Timeline("tl_tz", "Timeline with timezone")
+        timeline.add_event(event)
+        project = Project("proj_tz", "Timezone Test", "")
+        project.add_timeline(timeline)
+        project.add_source(self.source1)
 
         data = project_to_dict(project)
         loaded_project = project_from_dict(data)
@@ -308,11 +326,14 @@ class TestSerializer(unittest.TestCase):
 
     def test_multiple_timelines_serialization(self):
         """Test serialization of project with multiple timelines"""
-        timeline1 = Timeline("tl_1", "Timeline 1", [self.event1])
-        timeline2 = Timeline("tl_2", "Timeline 2", [self.event2])
-        project = Project(
-            "proj_multi", "Multi Timeline", "", [timeline1, timeline2], [self.source1]
-        )
+        timeline1 = Timeline("tl_1", "Timeline 1")
+        timeline1.add_event(self.event1)
+        timeline2 = Timeline("tl_2", "Timeline 2")
+        timeline2.add_event(self.event2)
+        project = Project("proj_multi", "Multi Timeline", "")
+        project.add_timeline(timeline1)
+        project.add_timeline(timeline2)
+        project.add_source(self.source1)
 
         data = project_to_dict(project)
         loaded_project = project_from_dict(data)
@@ -324,13 +345,11 @@ class TestSerializer(unittest.TestCase):
     def test_multiple_sources_serialization(self):
         """Test serialization of project with multiple sources"""
         source3 = Source("src_3", "Source 3", "ref://source3")
-        project = Project(
-            "proj_multi_src",
-            "Multi Source",
-            "",
-            [self.timeline],
-            [self.source1, self.source2, source3],
-        )
+        project = Project("proj_multi_src", "Multi Source", "")
+        project.add_timeline(self.timeline)
+        project.add_source(self.source1)
+        project.add_source(self.source2)
+        project.add_source(source3)
 
         data = project_to_dict(project)
         loaded_project = project_from_dict(data)
